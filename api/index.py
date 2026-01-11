@@ -1,11 +1,13 @@
 import sys
 import os
 
-# Add parent directory to path so we can import app
+# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import app
+# Set Vercel environment variable before importing app
+os.environ['VERCEL'] = '1'
 
-# Vercel serverless handler
-if __name__ == "__main__":
-    app.run()
+from app import app as application
+
+# Handler for Vercel
+app = application
