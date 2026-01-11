@@ -808,6 +808,249 @@
     {% block scripts %}{% endblock %}
 
     <script>
+    // ============================================
+    // LOCAL STORAGE DATA LAYER
+    // All user data is stored in browser localStorage
+    // ============================================
+    const SeikoData = {
+        // Initialize default data if not exists
+        init() {
+            if (!localStorage.getItem('seiko_profile')) {
+                localStorage.setItem('seiko_profile', JSON.stringify({ gpa: null, sat_score: null, act_score: null }));
+            }
+            if (!localStorage.getItem('seiko_colleges')) {
+                localStorage.setItem('seiko_colleges', JSON.stringify([]));
+            }
+        },
+
+        // Profile methods
+        getProfile() {
+            return JSON.parse(localStorage.getItem('seiko_profile') || '{}');
+        },
+        saveProfile(profile) {
+            localStorage.setItem('seiko_profile', JSON.stringify(profile));
+        },
+
+        // College methods
+        getColleges() {
+            return JSON.parse(localStorage.getItem('seiko_colleges') || '[]');
+        },
+        getCollege(id) {
+            return this.getColleges().find(c => c.id === id);
+        },
+        saveCollege(college) {
+            const colleges = this.getColleges();
+            const index = colleges.findIndex(c => c.id === college.id);
+            if (index >= 0) {
+                colleges[index] = college;
+            } else {
+                college.id = Date.now();
+                college.created_at = new Date().toISOString();
+                college.tasks = college.tasks || [
+                    { id: 1, name: 'Complete Application', category: 'application', is_done: false },
+                    { id: 2, name: 'Request Transcript', category: 'document', is_done: false },
+                    { id: 3, name: 'Send Test Scores', category: 'document', is_done: false },
+                    { id: 4, name: 'Counselor Recommendation', category: 'recommendation', is_done: false },
+                    { id: 5, name: 'Teacher Recommendation', category: 'recommendation', is_done: false },
+                    { id: 6, name: 'Submit Application Fee', category: 'financial', is_done: false },
+                ];
+                college.essays = college.essays || [];
+                colleges.push(college);
+            }
+            localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            return college;
+        },
+        deleteCollege(id) {
+            const colleges = this.getColleges().filter(c => c.id !== id);
+            localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+        },
+        updateCollegeStatus(id, status) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === id);
+            if (college) {
+                college.status = status;
+                college.updated_at = new Date().toISOString();
+                localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            }
+        },
+
+        // Task methods
+        toggleTask(collegeId, taskId) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college && college.tasks) {
+                const task = college.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.is_done = !task.is_done;
+                    // Auto-update status if all tasks done
+                    const allDone = college.tasks.every(t => t.is_done);
+                    if (allDone && !['submitted', 'accepted', 'rejected', 'waitlisted', 'withdrawn'].includes(college.status)) {
+                        college.status = 'submitted';
+                    }
+                    localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+                    return { done: task.is_done, allDone };
+                }
+            }
+            return null;
+        },
+        addTask(collegeId, task) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college) {
+                task.id = Date.now();
+                task.is_done = false;
+                college.tasks = college.tasks || [];
+                college.tasks.push(task);
+                localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            }
+        },
+        deleteTask(collegeId, taskId) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college && college.tasks) {
+                college.tasks = college.tasks.filter(t => t.id !== taskId);
+                localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            }
+        },
+
+        // Essay methods
+        addEssay(collegeId, essay) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college) {
+                essay.id = Date.now();
+                college.essays = college.essays || [];
+                college.essays.push(essay);
+                localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            }
+        },
+        updateEssayStatus(collegeId, essayId, status) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college && college.essays) {
+                const essay = college.essays.find(e => e.id === essayId);
+                if (essay) {
+                    essay.status = status;
+                    localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+                }
+            }
+        },
+        deleteEssay(collegeId, essayId) {
+            const colleges = this.getColleges();
+            const college = colleges.find(c => c.id === collegeId);
+            if (college && college.essays) {
+                college.essays = college.essays.filter(e => e.id !== essayId);
+                localStorage.setItem('seiko_colleges', JSON.stringify(colleges));
+            }
+        },
+
+        // Utility methods
+        daysUntil(dateStr) {
+            if (!dateStr) return null;
+            const deadline = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            deadline.setHours(0, 0, 0, 0);
+            return Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+        },
+
+        calculateChances(profile, college) {
+            if (!profile || (!profile.gpa && !profile.sat_score && !profile.act_score)) {
+                return null;
+            }
+            let score = 50;
+            const factors = [];
+
+            // GPA comparison
+            if (profile.gpa && college.avg_gpa) {
+                const gpaDiff = profile.gpa - college.avg_gpa;
+                if (gpaDiff >= 0.1) {
+                    score += 15;
+                    factors.push({ type: 'gpa', level: 'above', text: `Your GPA (${profile.gpa}) is above average (${college.avg_gpa})` });
+                } else if (gpaDiff >= -0.1) {
+                    score += 5;
+                    factors.push({ type: 'gpa', level: 'match', text: `Your GPA (${profile.gpa}) matches average (${college.avg_gpa})` });
+                } else if (gpaDiff >= -0.2) {
+                    score -= 10;
+                    factors.push({ type: 'gpa', level: 'below', text: `Your GPA (${profile.gpa}) is slightly below average (${college.avg_gpa})` });
+                } else {
+                    score -= 20;
+                    factors.push({ type: 'gpa', level: 'below', text: `Your GPA (${profile.gpa}) is below average (${college.avg_gpa})` });
+                }
+            }
+
+            // SAT comparison
+            if (profile.sat_score && college.acceptance_rate) {
+                const rate = college.acceptance_rate;
+                let estSat = rate <= 10 ? 1520 : rate <= 20 ? 1450 : rate <= 35 ? 1380 : rate <= 50 ? 1300 : 1200;
+                const satDiff = profile.sat_score - estSat;
+                if (satDiff >= 50) {
+                    score += 15;
+                    factors.push({ type: 'sat', level: 'above', text: `Your SAT (${profile.sat_score}) is above typical (${estSat})` });
+                } else if (satDiff >= -30) {
+                    score += 5;
+                    factors.push({ type: 'sat', level: 'match', text: `Your SAT (${profile.sat_score}) is competitive (${estSat} typical)` });
+                } else if (satDiff >= -80) {
+                    score -= 10;
+                    factors.push({ type: 'sat', level: 'below', text: `Your SAT (${profile.sat_score}) is below typical (${estSat})` });
+                } else {
+                    score -= 20;
+                    factors.push({ type: 'sat', level: 'below', text: `Your SAT (${profile.sat_score}) is well below typical (${estSat})` });
+                }
+            }
+
+            // Acceptance rate factor
+            if (college.acceptance_rate) {
+                const rate = college.acceptance_rate;
+                if (rate <= 10) score -= 15;
+                else if (rate <= 20) score -= 5;
+                else if (rate >= 50) score += 10;
+            }
+
+            score = Math.max(5, Math.min(95, score));
+
+            let category, label, color;
+            if (score >= 70) { category = 'likely'; label = 'Likely'; color = '#10b981'; }
+            else if (score >= 50) { category = 'match'; label = 'Match'; color = '#3b82f6'; }
+            else if (score >= 30) { category = 'reach'; label = 'Reach'; color = '#f59e0b'; }
+            else { category = 'far_reach'; label = 'Far Reach'; color = '#ef4444'; }
+
+            return { score, category, label, color, factors };
+        }
+    };
+
+    // Initialize data on page load
+    SeikoData.init();
+
+    // Status and type info helpers
+    const STATUSES = {
+        researching: { name: 'Researching', color: '#64748b' },
+        preparing: { name: 'Preparing', color: '#f59e0b' },
+        in_progress: { name: 'In Progress', color: '#3b82f6' },
+        submitted: { name: 'Submitted', color: '#8b5cf6' },
+        interview: { name: 'Interview', color: '#ec4899' },
+        accepted: { name: 'Accepted', color: '#10b981' },
+        waitlisted: { name: 'Waitlisted', color: '#f97316' },
+        rejected: { name: 'Rejected', color: '#ef4444' },
+        withdrawn: { name: 'Withdrawn', color: '#6b7280' }
+    };
+
+    const SCHOOL_TYPES = {
+        safety: { name: 'Safety', color: '#10b981' },
+        match: { name: 'Match', color: '#3b82f6' },
+        reach: { name: 'Reach', color: '#f59e0b' },
+        far_reach: { name: 'Far Reach', color: '#ef4444' }
+    };
+
+    const DEADLINE_TYPES = {
+        ed: { name: 'Early Decision', typical: 'Nov 1-15' },
+        ed2: { name: 'Early Decision II', typical: 'Jan 1-15' },
+        ea: { name: 'Early Action', typical: 'Nov 1-15' },
+        rea: { name: 'Restrictive EA', typical: 'Nov 1' },
+        rd: { name: 'Regular Decision', typical: 'Jan 1-15' },
+        rolling: { name: 'Rolling', typical: 'Varies' }
+    };
+
     // Theme System with Mode + Scheme + Effects
     const canvas = document.getElementById('themeCanvas');
     const ctx = canvas ? canvas.getContext('2d') : null;

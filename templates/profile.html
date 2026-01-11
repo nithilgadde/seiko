@@ -12,22 +12,22 @@
 
 <div class="card" style="max-width: 500px;">
     <div class="card-body">
-        <form action="/profile" method="POST">
+        <form id="profileForm">
             <div class="form-group">
                 <label class="form-label">GPA (Unweighted)</label>
-                <input type="number" name="gpa" class="form-input" value="{{ profile.gpa or '' }}" placeholder="e.g., 3.85" step="0.01" min="0" max="4">
+                <input type="number" name="gpa" id="gpa" class="form-input" placeholder="e.g., 3.85" step="0.01" min="0" max="4">
                 <p class="text-xs text-muted mt-1">Your unweighted GPA on a 4.0 scale</p>
             </div>
 
             <div class="form-group">
                 <label class="form-label">SAT Score</label>
-                <input type="number" name="sat_score" class="form-input" value="{{ profile.sat_score or '' }}" placeholder="e.g., 1520" min="400" max="1600">
+                <input type="number" name="sat_score" id="sat_score" class="form-input" placeholder="e.g., 1520" min="400" max="1600">
                 <p class="text-xs text-muted mt-1">Combined SAT score (400-1600)</p>
             </div>
 
             <div class="form-group">
                 <label class="form-label">ACT Score</label>
-                <input type="number" name="act_score" class="form-input" value="{{ profile.act_score or '' }}" placeholder="e.g., 34" min="1" max="36">
+                <input type="number" name="act_score" id="act_score" class="form-input" placeholder="e.g., 34" min="1" max="36">
                 <p class="text-xs text-muted mt-1">Composite ACT score (1-36)</p>
             </div>
 
@@ -39,33 +39,64 @@
     </div>
 </div>
 
-{% if profile.gpa or profile.sat_score or profile.act_score %}
-<div class="card mt-4" style="max-width: 500px;">
+<div id="statsCard" class="card mt-4" style="max-width: 500px; display: none;">
     <div class="card-header">
         <span class="card-title">Your Stats</span>
     </div>
     <div class="card-body">
-        <div class="grid grid-3">
-            {% if profile.gpa %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ profile.gpa }}</div>
-                <div class="text-sm text-secondary">GPA</div>
-            </div>
-            {% endif %}
-            {% if profile.sat_score %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ profile.sat_score }}</div>
-                <div class="text-sm text-secondary">SAT</div>
-            </div>
-            {% endif %}
-            {% if profile.act_score %}
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ profile.act_score }}</div>
-                <div class="text-sm text-secondary">ACT</div>
-            </div>
-            {% endif %}
+        <div class="grid grid-3" id="statsGrid">
         </div>
     </div>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadProfile() {
+    const profile = SeikoData.getProfile();
+    if (profile.gpa) document.getElementById('gpa').value = profile.gpa;
+    if (profile.sat_score) document.getElementById('sat_score').value = profile.sat_score;
+    if (profile.act_score) document.getElementById('act_score').value = profile.act_score;
+
+    // Show stats card if any stats exist
+    if (profile.gpa || profile.sat_score || profile.act_score) {
+        document.getElementById('statsCard').style.display = 'block';
+        let html = '';
+        if (profile.gpa) {
+            html += `<div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">${profile.gpa}</div>
+                <div class="text-sm text-secondary">GPA</div>
+            </div>`;
+        }
+        if (profile.sat_score) {
+            html += `<div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">${profile.sat_score}</div>
+                <div class="text-sm text-secondary">SAT</div>
+            </div>`;
+        }
+        if (profile.act_score) {
+            html += `<div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">${profile.act_score}</div>
+                <div class="text-sm text-secondary">ACT</div>
+            </div>`;
+        }
+        document.getElementById('statsGrid').innerHTML = html;
+    }
+}
+
+document.getElementById('profileForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const profile = {
+        gpa: parseFloat(document.getElementById('gpa').value) || null,
+        sat_score: parseInt(document.getElementById('sat_score').value) || null,
+        act_score: parseInt(document.getElementById('act_score').value) || null
+    };
+
+    SeikoData.saveProfile(profile);
+    window.location.href = '/dashboard';
+});
+
+loadProfile();
+</script>
 {% endblock %}

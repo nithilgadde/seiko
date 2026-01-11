@@ -12,7 +12,7 @@
 
 <div class="card" style="max-width: 700px;">
     <div class="card-body">
-        <form action="/school/add" method="POST" id="addSchoolForm">
+        <form id="addSchoolForm">
             <div class="form-group" style="position: relative;">
                 <label class="form-label">School Name *</label>
                 <input type="text" name="name" id="schoolName" class="form-input" placeholder="Start typing... (e.g., Harvard, MIT, UCLA)" required autocomplete="off">
@@ -27,9 +27,10 @@
                 <div class="form-group">
                     <label class="form-label">School Type</label>
                     <select name="type" id="schoolType" class="form-select">
-                        {% for value, label, color in school_types %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
+                        <option value="safety">Safety</option>
+                        <option value="match">Match</option>
+                        <option value="reach" selected>Reach</option>
+                        <option value="far_reach">Far Reach</option>
                     </select>
                 </div>
             </div>
@@ -38,9 +39,12 @@
                 <div class="form-group">
                     <label class="form-label">Deadline Type</label>
                     <select name="deadline_type" id="deadlineType" class="form-select">
-                        {% for value, label, typical in deadline_types %}
-                        <option value="{{ value }}">{{ label }} ({{ typical }})</option>
-                        {% endfor %}
+                        <option value="ed">Early Decision (Nov 1-15)</option>
+                        <option value="ed2">Early Decision II (Jan 1-15)</option>
+                        <option value="ea">Early Action (Nov 1-15)</option>
+                        <option value="rea">Restrictive EA (Nov 1)</option>
+                        <option value="rd" selected>Regular Decision (Jan 1-15)</option>
+                        <option value="rolling">Rolling (Varies)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -67,7 +71,7 @@
 
             <div class="form-group">
                 <label class="form-label">Notes</label>
-                <textarea name="notes" class="form-textarea" placeholder="Any notes about this school..."></textarea>
+                <textarea name="notes" id="notes" class="form-textarea" placeholder="Any notes about this school..."></textarea>
             </div>
 
             <div class="flex gap-3 mt-4">
@@ -181,7 +185,7 @@ schoolInput.addEventListener('input', function() {
                 }
 
                 dropdown.innerHTML = colleges.map(college => `
-                    <div class="autocomplete-item" data-college='${JSON.stringify(college)}'>
+                    <div class="autocomplete-item" data-college='${JSON.stringify(college).replace(/'/g, "&#39;")}'>
                         <div class="school-name">${college.name} <span class="autofill-badge">Auto-fill</span></div>
                         <div class="school-info">${college.location}</div>
                         <div class="school-stats">
@@ -203,7 +207,7 @@ dropdown.addEventListener('click', function(e) {
     const item = e.target.closest('.autocomplete-item');
     if (!item) return;
 
-    const college = JSON.parse(item.dataset.college);
+    const college = JSON.parse(item.dataset.college.replace(/&#39;/g, "'"));
 
     // Fill in all fields
     document.getElementById('schoolName').value = college.name;
@@ -257,6 +261,27 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         dropdown.classList.remove('show');
     }
+});
+
+// Handle form submission - save to localStorage
+document.getElementById('addSchoolForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const college = {
+        name: document.getElementById('schoolName').value,
+        location: document.getElementById('location').value,
+        type: document.getElementById('schoolType').value,
+        deadline_type: document.getElementById('deadlineType').value,
+        deadline_date: document.getElementById('deadlineDate').value || null,
+        status: 'researching',
+        avg_gpa: parseFloat(document.getElementById('avgGpa').value) || null,
+        acceptance_rate: parseFloat(document.getElementById('acceptanceRate').value) || null,
+        portal_url: document.getElementById('portalUrl').value,
+        notes: document.getElementById('notes').value
+    };
+
+    const saved = SeikoData.saveCollege(college);
+    window.location.href = '/school/' + saved.id;
 });
 </script>
 {% endblock %}
