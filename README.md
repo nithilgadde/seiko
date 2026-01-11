@@ -52,6 +52,8 @@ Seiko is a modern web application designed to help high school students organize
 
 ## Getting Started
 
+# Check the app out at https://seiko-wheat.vercel.app/
+
 ### Prerequisites
 - Python 3.8+
 - pip
