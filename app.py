@@ -3,10 +3,19 @@ import sqlite3
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, jsonify, g
 
-app = Flask(__name__)
-app.secret_key = 'college-tracker-2024'
+# Get the directory where this file is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATABASE = 'tracker.db'
+app = Flask(__name__,
+            template_folder=os.path.join(BASE_DIR, 'templates'),
+            static_folder=os.path.join(BASE_DIR, 'static'))
+app.secret_key = os.environ.get('SECRET_KEY', 'college-tracker-2024')
+
+# Use /tmp for database on Vercel (serverless), otherwise use local
+if os.environ.get('VERCEL'):
+    DATABASE = '/tmp/tracker.db'
+else:
+    DATABASE = os.path.join(BASE_DIR, 'tracker.db')
 
 def get_db():
     db = getattr(g, '_database', None)
