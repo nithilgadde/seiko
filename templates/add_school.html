@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Add School - Seiko{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Add School</h1>
+        <p class="page-subtitle">Start typing to search 100+ colleges with auto-fill</p>
+    </div>
+</div>
+
+<div class="card" style="max-width: 700px;">
+    <div class="card-body">
+        <form action="/school/add" method="POST" id="addSchoolForm">
+            <div class="form-group" style="position: relative;">
+                <label class="form-label">School Name *</label>
+                <input type="text" name="name" id="schoolName" class="form-input" placeholder="Start typing... (e.g., Harvard, MIT, UCLA)" required autocomplete="off">
+                <div id="autocompleteDropdown" class="autocomplete-dropdown"></div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Location</label>
+                    <input type="text" name="location" id="location" class="form-input" placeholder="e.g., Stanford, CA">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">School Type</label>
+                    <select name="type" id="schoolType" class="form-select">
+                        {% for value, label, color in school_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Deadline Type</label>
+                    <select name="deadline_type" id="deadlineType" class="form-select">
+                        {% for value, label, typical in deadline_types %}
+                        <option value="{{ value }}">{{ label }} ({{ typical }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Deadline Date</label>
+                    <input type="date" name="deadline_date" id="deadlineDate" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Average GPA</label>
+                    <input type="number" name="avg_gpa" id="avgGpa" class="form-input" placeholder="e.g., 3.9" step="0.01" min="0" max="4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Acceptance Rate (%)</label>
+                    <input type="number" name="acceptance_rate" id="acceptanceRate" class="form-input" placeholder="e.g., 5" step="0.1" min="0" max="100">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Application Portal URL</label>
+                <input type="url" name="portal_url" id="portalUrl" class="form-input" placeholder="https://apply.stanford.edu">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-textarea" placeholder="Any notes about this school..."></textarea>
+            </div>
+
+            <div class="flex gap-3 mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Add School
+                </button>
+                <a href="/schools" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    margin-top: 4px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+.autocomplete-dropdown.show {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.autocomplete-item .school-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.autocomplete-item .school-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.autocomplete-item .school-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 4px;
+    font-size: 0.75rem;
+}
+
+.autocomplete-item .stat {
+    color: var(--text-secondary);
+}
+
+.autocomplete-item .stat strong {
+    color: var(--accent);
+}
+
+.autofill-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    background: rgba(99,102,241,0.15);
+    color: var(--accent);
+    font-size: 0.7rem;
+    border-radius: 100px;
+    margin-left: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const schoolInput = document.getElementById('schoolName');
+const dropdown = document.getElementById('autocompleteDropdown');
+
+let debounceTimer;
+
+schoolInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    const query = this.value.trim();
+
+    if (query.length < 2) {
+        dropdown.classList.remove('show');
+        return;
+    }
+
+    debounceTimer = setTimeout(() => {
+        fetch('/api/colleges/search?q=' + encodeURIComponent(query))
+            .then(r => r.json())
+            .then(colleges => {
+                if (colleges.length === 0) {
+                    dropdown.classList.remove('show');
+                    return;
+                }
+
+                dropdown.innerHTML = colleges.map(college => `
+                    <div class="autocomplete-item" data-college='${JSON.stringify(college)}'>
+                        <div class="school-name">${college.name} <span class="autofill-badge">Auto-fill</span></div>
+                        <div class="school-info">${college.location}</div>
+                        <div class="school-stats">
+                            <span class="stat">GPA: <strong>${college.avg_gpa}</strong></span>
+                            <span class="stat">Acceptance: <strong>${college.acceptance_rate}%</strong></span>
+                            ${college.ed ? '<span class="stat">ED available</span>' : ''}
+                            ${college.ea ? '<span class="stat">EA available</span>' : ''}
+                            ${college.rea ? '<span class="stat">REA available</span>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+                dropdown.classList.add('show');
+            });
+    }, 200);
+});
+
+dropdown.addEventListener('click', function(e) {
+    const item = e.target.closest('.autocomplete-item');
+    if (!item) return;
+
+    const college = JSON.parse(item.dataset.college);
+
+    // Fill in all fields
+    document.getElementById('schoolName').value = college.name;
+    document.getElementById('location').value = college.location || '';
+    document.getElementById('avgGpa').value = college.avg_gpa || '';
+    document.getElementById('acceptanceRate').value = college.acceptance_rate || '';
+    document.getElementById('portalUrl').value = college.portal || '';
+
+    // Determine deadline type and set date
+    if (college.ed) {
+        document.getElementById('deadlineType').value = 'ed';
+        document.getElementById('deadlineDate').value = college.ed;
+    } else if (college.ea) {
+        document.getElementById('deadlineType').value = 'ea';
+        document.getElementById('deadlineDate').value = college.ea;
+    } else if (college.rea) {
+        document.getElementById('deadlineType').value = 'rea';
+        document.getElementById('deadlineDate').value = college.rea;
+    } else if (college.rolling) {
+        document.getElementById('deadlineType').value = 'rolling';
+        document.getElementById('deadlineDate').value = college.rd || '';
+    } else {
+        document.getElementById('deadlineType').value = 'rd';
+        document.getElementById('deadlineDate').value = college.rd || '';
+    }
+
+    // Auto-determine school type based on acceptance rate
+    const rate = college.acceptance_rate;
+    if (rate <= 10) {
+        document.getElementById('schoolType').value = 'far_reach';
+    } else if (rate <= 25) {
+        document.getElementById('schoolType').value = 'reach';
+    } else if (rate <= 50) {
+        document.getElementById('schoolType').value = 'match';
+    } else {
+        document.getElementById('schoolType').value = 'safety';
+    }
+
+    dropdown.classList.remove('show');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.form-group')) {
+        dropdown.classList.remove('show');
+    }
+});
+
+// Close dropdown on escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        dropdown.classList.remove('show');
+    }
+});
+</script>
+{% endblock %}
