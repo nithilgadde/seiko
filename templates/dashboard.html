@@ -134,8 +134,14 @@ function renderDashboard() {
         }
     }
 
-    // Category
-    document.getElementById('categoryCard').innerHTML = `<div class="card"><div class="card-header"><span class="card-title">Schools by Category</span></div><div class="card-body"><div class="grid grid-4">${Object.entries(SCHOOL_TYPES).map(([k,v]) => `<div style="padding:1rem;background:var(--bg-primary);border-radius:var(--radius-sm);border-left:3px solid ${v.color};"><div style="font-size:1.5rem;font-weight:700;">${byType[k]||0}</div><div style="color:var(--text-secondary);font-size:.875rem;">${v.name}</div></div>`).join('')}</div></div></div>`;
+    // Category - group colleges by type
+    const collegesByType = {};
+    Object.keys(SCHOOL_TYPES).forEach(t => collegesByType[t] = []);
+    colleges.forEach(c => {
+        if (collegesByType[c.type]) collegesByType[c.type].push(c);
+    });
+
+    document.getElementById('categoryCard').innerHTML = `<div class="card"><div class="card-header"><span class="card-title">Schools by Category</span></div><div class="card-body"><div class="grid grid-4">${Object.entries(SCHOOL_TYPES).map(([k,v]) => `<div style="padding:1rem;background:var(--bg-primary);border-radius:var(--radius-sm);border-left:3px solid ${v.color};"><div style="font-size:1.5rem;font-weight:700;">${byType[k]||0}</div><div style="color:var(--text-secondary);font-size:.875rem;margin-bottom:.5rem;">${v.name}</div>${collegesByType[k].length > 0 ? `<div style="display:flex;flex-direction:column;gap:.25rem;margin-top:.5rem;">${collegesByType[k].map(c => `<a href="/school/${c.id}" class="school-link" style="font-size:.8rem;font-weight:500;">${c.name}</a>`).join('')}</div>` : ''}</div>`).join('')}</div></div></div>`;
 }
 
 function toggleTaskDash(collegeId, taskId, el) {
