@@ -1,4 +1,4 @@
-# Seiko
+# Seiko: BUILD4STUDENTS THIRD PLACE WINNER
 
 **Your College Application Command Center**
 
